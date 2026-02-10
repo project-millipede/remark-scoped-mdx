@@ -5,10 +5,6 @@ import type { StringKeys } from '../mdx/type-utils';
 import type { MdxRenameTarget } from '../types';
 import { PropsField, RawPropsOf } from './transform-props';
 
-// =============================================================================
-// Part 2: The Context Assembly (MDX Authoring)
-// =============================================================================
-
 /**
  * Registry key type (string-only).
  *

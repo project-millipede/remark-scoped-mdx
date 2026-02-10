@@ -11,10 +11,6 @@ import type { PropsOfEntry } from '../mdx/entry-protocol';
 
 import { type StringKeys } from '../mdx/type-utils';
 
-// =============================================================================
-// Part 1: Type Inference Engine
-// =============================================================================
-
 /**
  * Entry point for the type inference chain.
  *
@@ -30,10 +26,6 @@ import { type StringKeys } from '../mdx/type-utils';
  *   It does *not* look inside the box or iterate over keys. Consequently,
  *   specific property types (like `label: string | null`) are preserved
  *   exactly as defined in the component.
- *
- * Usage:
- * - Used by `plugin-authoring.ts` to infer props for rename rules.
- * - Used by `loadable-entry.ts` to type the component for runtime loaders.
  *
  * Mechanics:
  * 1. **Retrieval**: `PropsOfEntry<...>` (alias of `PropsOfEntryOr<..., {}>`)

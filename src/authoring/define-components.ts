@@ -9,10 +9,6 @@ import {
 
 import { stringKeysOf } from '../mdx/type-utils';
 
-// =============================================================================
-// Part 3: The Integrator (defineComponents)
-// =============================================================================
-
 /**
  * Transform rules keyed by component name.
  *
