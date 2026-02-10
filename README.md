@@ -7,6 +7,24 @@ component override decisions from global runtime mappings to scoped AST
 transforms, so standard tags (`p`, `br`) and custom components can be rewritten
 based on nesting context.
 
+## Table of Contents
+
+1. [Features](#features)
+2. [Why Scoped Rewrites](#why-scoped-rewrites)
+3. [When You Need Scoped Overrides](#when-you-need-scoped-overrides)
+4. [Installation](#installation)
+5. [Examples](#examples)
+6. [How to Use](#how-to-use)
+7. [Step 1: Define Rules](#step-1-define-rules)
+8. [Step 2: Register Plugin](#step-2-register-plugin)
+9. [Step 3: Build the Runtime Component Map (Simple)](#step-3-build-the-runtime-component-map-simple)
+10. [Configuration Reference](#configuration-reference)
+11. [Public API](#public-api)
+12. [Authoring Utilities (Why This Helps)](#authoring-utilities-why-this-helps)
+13. [Transform Option Reference](#transform-option-reference)
+14. [Advanced: Traversal and Limitations](#advanced-traversal-and-limitations)
+15. [Dedicated Example: Behavior Context (Optional, Advanced)](#dedicated-example-behavior-context-optional-advanced)
+
 ## Features
 
 - **🧭 True Scoped Overrides:** Rewrites run only inside configured scope
@@ -277,35 +295,73 @@ return <ScopedContent />;
 
 ## Configuration Reference
 
-### Plugin Options
-
-`remarkScopedMdx` takes one argument:
+### Public API
 
 ```ts
-type ScopedMdxTransformRegistry = Record<string, MdxTransformRule>;
+import {
+  remarkScopedMdx,
+  deriveMdxTransformRegistry,
+  expandHydratedComponentNames,
+  defineComponents,
+  defineEntry,
+  createDefineEntry,
+  createLoaderUtils
+} from 'remark-scoped-mdx';
+import type { LoaderResolverInput } from 'remark-scoped-mdx';
 ```
 
-`MdxTransformRule` currently supports:
+| Export | Kind | Purpose | Typical step |
+| ------ | ---- | ------- | ------------ |
+| `remarkScopedMdx` | remark plugin | Applies scoped `renameFlow` rewrites during MDX compile. | Step 2 |
+| `defineComponents` | authoring helper | Defines the typed scope registry and transform rules. | Step 1 |
+| `defineEntry` | authoring helper | Registers static/dynamic entries with inferred component props (default runtime config). | Step 1 |
+| `createDefineEntry` | authoring helper factory | Creates a project-specific `defineEntry` with typed runtime flags (advanced). | Advanced Step 1 |
+| `deriveMdxTransformRegistry` | registry adapter | Converts typed component definitions into plugin-ready transform config. | Step 1 |
+| `createLoaderUtils` | runtime loader factory | Binds a resolver and returns runtime helpers (`createComponentSet`, `getLoadableComponents`, `getLoadableComponentsFromSet`). | Step 3a |
+| `expandHydratedComponentNames` | runtime registry adapter | Adds transform-introduced component names to hydrated names before runtime map resolution. | Step 3b |
+| `LoaderResolverInput` | type export | Types the resolver input entry (`component` or `loader` plus runtime config flags). | Step 3a / Advanced Step 3a |
 
-```ts
-type MdxTransformRule = {
-  renameFlow?: Record<
-    string,
-    {
-      component: {
-        name: string;
-        props?: Record<string, unknown>;
-      };
-      transformOptions?: {
-        childrenPolicy?: 'preserve' | 'clear';
-      };
-    }
-  >;
-};
+### Authoring Utilities (Why This Helps)
+
+- `defineEntry`: register one component/loader and capture its source props for
+  downstream inference.
+- `defineComponents`: define one registry plus scoped transform rules in one
+  place.
+- `ctx.transform(...)`: author one rule per scope component.
+- `rule.flow(...)`: map source flow tags (`p`, `br`, etc.) to target rewrites.
+- `target.to(...)`: set `{ component: { name, props } }` with name/props linkage
+  checked at compile time.
+
+In this example, `AlertParagraph` must be declared in the registry first.
+Selecting `name: 'AlertParagraph'` in `to(...)` then activates prop inference
+from `AlertParagraphProps`.
+
+### Transform Option Reference
+
+`childrenPolicy` is part of `renameFlow` target `transformOptions` and controls
+how children are handled on the renamed MDX JSX **flow** element.
+
+| `childrenPolicy` value | Plugin behavior | Typical use |
+| ---------------------- | --------------- | ----------- |
+| `'preserve'` or omitted | Keeps existing children when renaming. | Container replacements like `p -> AlertParagraph`. |
+| `'clear'` | Clears children (`element.children = []`) after rename. | Marker/void-style replacements like `br -> MessageBlankLine`. |
+
+Examples:
+
+```mdx
+// preserve (default)
+<p>Hello</p>
+// -> <AlertParagraph>Hello</AlertParagraph>
+
+// clear
+<br />
+// -> <MessageBlankLine />
 ```
 
-Recommended practice: generate this object from your typed component registry
-via `deriveMdxTransformRegistry(scopeRegistry)` instead of hand-writing it.
+Notes:
+- This option applies only to scoped `renameFlow` rewrites.
+- It affects MDX JSX **flow** nodes only (`MdxJsxFlowElement`).
+- It does not affect inline JSX text nodes or markdown `paragraph` nodes.
 
 ## Advanced: Traversal and Limitations
 
