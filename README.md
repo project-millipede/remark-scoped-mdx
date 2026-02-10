@@ -43,10 +43,12 @@ context-specific behavior.
 ## Installation
 
 ```bash
-npm install remark-scoped-mdx unified react next
+npm install remark-scoped-mdx unified react
 # or
-pnpm add remark-scoped-mdx unified react next
+pnpm add remark-scoped-mdx unified react
 ```
+
+If you use `next/dynamic` in the runtime resolver examples, also install `next`.
 
 ## Examples
 
@@ -76,7 +78,7 @@ import { defineComponents, defineEntry } from 'remark-scoped-mdx';
 import { AlertParagraph } from './AlertParagraph';
 import { ArticleScope } from './ArticleScope';
 
-export const nestedDocComponents = defineComponents(
+export const scopeRegistry = defineComponents(
   {
     ArticleScope: defineEntry({
       component: ArticleScope
@@ -119,7 +121,7 @@ Declaration principle:
 
 ## How to Use
 
-> **Important:** This plugin requires **three configuration steps**: define your component rules, register the plugin with your MDX compiler, then build the runtime component map for rendering.
+> **Important:** This plugin requires **three configuration steps**: define your component rules, register the plugin with your MDX compiler, then build the runtime component map for rendering. Steps 1-2 handle compile-time rewrites; Step 3 enables scoped component rendering at runtime.
 
 ### Step 1: Define Rules
 
@@ -132,7 +134,7 @@ import {
   deriveMdxTransformRegistry
 } from 'remark-scoped-mdx';
 
-export const nestedDocComponents = defineComponents(
+export const scopeRegistry = defineComponents(
   {
     ArticleScope: defineEntry({ component: ArticleScope }),
     AlertParagraph: defineEntry({ component: AlertParagraph })
@@ -148,8 +150,8 @@ export const nestedDocComponents = defineComponents(
   })
 );
 
-export const mdxTransformRegistry =
-  deriveMdxTransformRegistry(nestedDocComponents);
+export const scopeTransformRegistry =
+  deriveMdxTransformRegistry(scopeRegistry);
 ```
 
 Minimal registration preview (full options are shown in Step 2):
@@ -158,7 +160,7 @@ Minimal registration preview (full options are shown in Step 2):
 import { remarkScopedMdx } from 'remark-scoped-mdx';
 
 const mdxOptions = {
-  remarkPlugins: [[remarkScopedMdx, mdxTransformRegistry]]
+  remarkPlugins: [[remarkScopedMdx, scopeTransformRegistry]]
 };
 ```
 
@@ -171,15 +173,11 @@ configuration.
 
 ```ts
 import { compile, type CompileOptions } from '@mdx-js/mdx';
-import remarkGfm from 'remark-gfm';
 import { remarkScopedMdx } from 'remark-scoped-mdx';
-import { mdxTransformRegistry } from './nestedDocComponents';
+import { scopeTransformRegistry } from './scopeRegistry';
 
 const mdxOptions: CompileOptions = {
-  remarkPlugins: [
-    remarkGfm,
-    [remarkScopedMdx, mdxTransformRegistry]
-  ],
+  remarkPlugins: [[remarkScopedMdx, scopeTransformRegistry]],
   providerImportSource: '@mdx-js/react'
 };
 
@@ -192,7 +190,7 @@ const compiled = await compile(mdxSource, mdxOptions);
 // next.config.mjs
 import createMDX from '@next/mdx';
 import { remarkScopedMdx } from 'remark-scoped-mdx';
-import { mdxTransformRegistry } from './src/mdx/nestedDocComponents.js';
+import { scopeTransformRegistry } from './src/mdx/scopeRegistry.js';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -201,7 +199,7 @@ const nextConfig = {
 
 const withMDX = createMDX({
   options: {
-    remarkPlugins: [[remarkScopedMdx, mdxTransformRegistry]]
+    remarkPlugins: [[remarkScopedMdx, scopeTransformRegistry]]
   }
 });
 
@@ -210,24 +208,31 @@ export default withMDX(nextConfig);
 
 ### Step 3: Build the Runtime Component Map (Simple)
 
-For rendering, resolve the component map for the current MDX document using the
-hydrated component names plus transform expansion.
-
-Minimal runtime setup preview:
+#### Step 3a: Create the resolver and component set
 
 ```ts
-const resolveEntry = ((entry => {
+import dynamic from 'next/dynamic';
+import {
+  createLoaderUtils,
+  type LoaderResolverInput
+} from 'remark-scoped-mdx';
+
+const resolveEntry = <Props extends object>(
+  entry: LoaderResolverInput<Props, {}>
+) => {
   if ('loader' in entry && entry.loader) {
     return dynamic(entry.loader, { ...(entry.dynamicOptions ?? {}) });
   }
   return entry.component;
-}) as LoaderResolver<{}>);
+};
 
 const { createComponentSet, getLoadableComponentsFromSet } =
   createLoaderUtils(resolveEntry);
 
-const nestedComponentSet = createComponentSet(nestedDocComponents);
+const scopedComponentSet = createComponentSet(scopeRegistry);
 ```
+
+#### Step 3b: Resolve hydrated components and create a renderable MDX content component
 
 ```tsx
 import type { FC } from 'react';
@@ -235,12 +240,12 @@ import { MDXProvider } from '@mdx-js/react';
 import type { MDXContentProps } from 'mdx/types';
 import { expandHydratedComponentNames } from 'remark-scoped-mdx';
 
-// Assumes the setup preview above already exists in this module:
+// Assumes Step 3a already exists in this module:
 // - getLoadableComponentsFromSet
-// - nestedComponentSet
-// - nestedDocComponents
+// - scopedComponentSet
+// - scopeRegistry
 
-export const withNestedComponents = (
+export const createScopedMdxContent = (
   Component: FC<MDXContentProps>,
   hydratedComponents: Array<string>
 ) => {
@@ -248,20 +253,26 @@ export const withNestedComponents = (
 
   const expanded = expandHydratedComponentNames(
     hydratedSet,
-    nestedDocComponents
+    scopeRegistry
   );
 
-  const nestedLoadableComponents = getLoadableComponentsFromSet(
-    nestedComponentSet,
+  const scopedLoadableComponents = getLoadableComponentsFromSet(
+    scopedComponentSet,
     expanded
   );
 
   return (props: MDXContentProps) => (
-    <MDXProvider components={nestedLoadableComponents} disableParentContext>
+    <MDXProvider components={scopedLoadableComponents} disableParentContext>
       <Component {...props} />
     </MDXProvider>
   );
 };
+```
+
+```tsx
+// Page-level usage example
+const ScopedContent = createScopedMdxContent(Content, hydratedComponents);
+return <ScopedContent />;
 ```
 
 ## Configuration Reference
@@ -294,7 +305,7 @@ type MdxTransformRule = {
 ```
 
 Recommended practice: generate this object from your typed component registry
-via `deriveMdxTransformRegistry(nestedDocComponents)` instead of hand-writing it.
+via `deriveMdxTransformRegistry(scopeRegistry)` instead of hand-writing it.
 
 ## Advanced: Traversal and Limitations
 
@@ -359,11 +370,14 @@ nested scope subtrees.
 This is a separate advanced pattern focused on runtime behavior control. It is
 not required for the basic scoped rewrite flow above.
 
-### 1. Define Runtime Flags and Demo Components
+### Advanced Step 1: Define Runtime Flags and Behavior-Aware Scope Registry
 
 ```tsx
 import type { FC, ReactNode } from 'react';
-import { createDefineEntry } from 'remark-scoped-mdx';
+import {
+  createDefineEntry,
+  defineComponents
+} from 'remark-scoped-mdx';
 
 type BehaviorScopeProps = {
   children?: ReactNode;
@@ -386,14 +400,8 @@ export type RuntimeConfig = {
 };
 
 export const defineEntry = createDefineEntry<RuntimeConfig>();
-```
 
-### 2. Define Behavior-Aware Entries and Transform Rules
-
-```tsx
-import { defineComponents } from 'remark-scoped-mdx';
-
-export const behaviorDocComponents = defineComponents(
+export const behaviorScopedComponents = defineComponents(
   {
     BehaviorScope: defineEntry({
       component: BehaviorScope,
@@ -419,18 +427,34 @@ export const behaviorDocComponents = defineComponents(
 );
 ```
 
-### 3. Create a Runtime Resolver that Reads `RuntimeConfig`
+### Advanced Step 2: Derive and Register the Transform Registry
 
-```tsx
-import type { ComponentProps } from 'react';
-import dynamic from 'next/dynamic';
-import type {
-  LoaderResolver,
-  RuntimeEntryFor
+```ts
+import {
+  deriveMdxTransformRegistry,
+  remarkScopedMdx
 } from 'remark-scoped-mdx';
 
-function getBaseComponent(
-  entry: RuntimeEntryFor<object, RuntimeConfig>
+export const behaviorScopedTransformRegistry =
+  deriveMdxTransformRegistry(behaviorScopedComponents);
+
+const mdxOptions = {
+  remarkPlugins: [[remarkScopedMdx, behaviorScopedTransformRegistry]]
+};
+```
+
+### Advanced Step 3a: Create the Runtime Resolver and Component Set
+
+```tsx
+import type { ComponentType } from 'react';
+import dynamic from 'next/dynamic';
+import {
+  createLoaderUtils,
+  type LoaderResolverInput
+} from 'remark-scoped-mdx';
+
+function getBaseComponent<Props extends object>(
+  entry: LoaderResolverInput<Props, RuntimeConfig>
 ) {
   if ('loader' in entry && entry.loader) {
     const { loader, dynamicOptions } = entry;
@@ -439,41 +463,47 @@ function getBaseComponent(
   return entry.component;
 }
 
-const resolveEntry = ((entry => {
+function withSelection<Props extends object>(
+  BaseComponent: ComponentType<Props>,
+  requireWrapper: boolean
+) {
+  return (props: Props) => (
+    <SelectionBranch
+      Base={BaseComponent}
+      baseProps={props}
+      requireWrapper={requireWrapper}
+    />
+  );
+}
+
+function withRequiredWrapper<Props extends object>(
+  BaseComponent: ComponentType<Props>
+) {
+  return (props: Props) => {
+    const Wrapper = pickWrapper(true);
+    return (
+      <Wrapper>
+        <BaseComponent {...props} />
+      </Wrapper>
+    );
+  };
+}
+
+const resolveEntry = <Props extends object>(
+  entry: LoaderResolverInput<Props, RuntimeConfig>
+) => {
   const BaseComponent = getBaseComponent(entry);
 
   if (entry.injectSelection) {
-    return (props: ComponentProps<typeof BaseComponent>) => (
-      <SelectionBranch
-        Base={BaseComponent}
-        baseProps={props}
-        requireWrapper={!!entry.requireWrapper}
-      />
-    );
+    return withSelection(BaseComponent, !!entry.requireWrapper);
   }
 
   if (entry.requireWrapper) {
-    return (props: ComponentProps<typeof BaseComponent>) => {
-      const Wrapper = pickWrapper(true);
-      return (
-        <Wrapper>
-          <BaseComponent {...props} />
-        </Wrapper>
-      );
-    };
+    return withRequiredWrapper(BaseComponent);
   }
 
   return BaseComponent;
-}) as LoaderResolver<RuntimeConfig>);
-```
-
-### 4. Bind Loader Utilities and Derive the Transform Registry
-
-```ts
-import {
-  createLoaderUtils,
-  deriveMdxTransformRegistry
-} from 'remark-scoped-mdx';
+};
 
 export const {
   createComponentSet,
@@ -481,25 +511,11 @@ export const {
   getLoadableComponentsFromSet
 } = createLoaderUtils(resolveEntry);
 
-export const behaviorComponentSet = createComponentSet(behaviorDocComponents);
-
-export const behaviorTransformRegistry =
-  deriveMdxTransformRegistry(behaviorDocComponents);
+export const behaviorScopedComponentSet =
+  createComponentSet(behaviorScopedComponents);
 ```
 
-### 5. Wire Hydrated Expansion for Nested MDX Rendering
-
-For rendering, resolve the component map for the current MDX document using the
-hydrated component names plus transform expansion.
-
-Minimal runtime setup preview:
-
-```ts
-// Assumes Step 4 already defined:
-// - getLoadableComponentsFromSet
-// - behaviorComponentSet
-// - behaviorDocComponents
-```
+### Advanced Step 3b: Resolve Hydrated Components and Return Renderable Content
 
 ```tsx
 import type { FC } from 'react';
@@ -507,63 +523,42 @@ import { MDXProvider } from '@mdx-js/react';
 import type { MDXContentProps } from 'mdx/types';
 import { expandHydratedComponentNames } from 'remark-scoped-mdx';
 
-export const withCommonComponents = (
+// Assumes Advanced Step 3a already exists in this module:
+// - getLoadableComponentsFromSet
+// - behaviorScopedComponentSet
+// - behaviorScopedComponents
+
+export const createBehaviorScopedMdxContent = (
   Component: FC<MDXContentProps>,
   hydratedComponents: Array<string>
 ) => {
   const hydratedSet = new Set(hydratedComponents);
 
-  const expandedNestedSet = expandHydratedComponentNames(
+  const expandedBehaviorSet = expandHydratedComponentNames(
     hydratedSet,
-    behaviorDocComponents
+    behaviorScopedComponents
   );
 
-  const nestedLoadableComponents = getLoadableComponentsFromSet(
-    behaviorComponentSet,
-    expandedNestedSet
+  const behaviorLoadableComponents = getLoadableComponentsFromSet(
+    behaviorScopedComponentSet,
+    expandedBehaviorSet
   );
 
   return (props: MDXContentProps) => (
-    <MDXProvider components={nestedLoadableComponents} disableParentContext>
+    <MDXProvider components={behaviorLoadableComponents} disableParentContext>
       <Component {...props} />
     </MDXProvider>
   );
 };
 ```
 
-`SelectionBranch`, `pickWrapper`, `BehaviorScope`, and `BehaviorParagraph` are
-application-specific helpers/components shown to demonstrate this pattern.
-
-### Simpler Behavior-Context Variant
-
 ```tsx
-import type { ComponentProps } from 'react';
-import dynamic from 'next/dynamic';
-import {
-  createDefineEntry,
-  createLoaderUtils,
-  type LoaderResolver
-} from 'remark-scoped-mdx';
-
-type RuntimeConfig = {
-  injectSelection?: boolean;
-};
-
-const defineEntry = createDefineEntry<RuntimeConfig>();
-
-const resolveEntry = ((entry => {
-  const Base =
-    'loader' in entry && entry.loader
-      ? dynamic(entry.loader, { ...(entry.dynamicOptions ?? {}) })
-      : entry.component;
-
-  if (!entry.injectSelection) return Base;
-
-  return (props: ComponentProps<typeof Base>) => (
-    <SelectionBranch Base={Base} baseProps={props} requireWrapper={false} />
-  );
-}) as LoaderResolver<RuntimeConfig>);
-
-export const { createComponentSet, getLoadableComponentsFromSet } =
-  createLoaderUtils(resolveEntry);
+// Page-level usage example
+const ScopedContent = createBehaviorScopedMdxContent(Content, hydratedComponents);
+return <ScopedContent />;
 ```
+
+> Note
+> `SelectionBranch`, `pickWrapper`, `BehaviorScope`, and `BehaviorParagraph`
+> are placeholders in this advanced example. Replace them with the matching
+> wrappers/components from your own project.
