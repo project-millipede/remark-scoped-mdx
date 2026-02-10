@@ -38,7 +38,8 @@ import { type StringKeys } from '../mdx/type-utils';
  * Mechanics:
  * 1. **Retrieval**: `PropsOfEntry<...>` (alias of `PropsOfEntryOr<..., {}>`)
  *    initiates the reverse lookup chain. `PropsOfEntryOr` uses `infer P` to
- *    extract the type bound to the `[PROPS_IDENTITY_ANCHOR]` symbol slot.
+ *    extract the type bound to the `PROPS_IDENTITY_ANCHOR` protocol field on
+ *    `PhantomProps<P>`.
  * 2. **Narrowing**: `Extract<..., object>` filters the result to strictly match
  *    the `object` constraint.
  *    - This removes `null`, `undefined`, and primitives (see Examples).

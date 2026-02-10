@@ -50,8 +50,10 @@ import type { PhantomProps } from '../entry-protocol';
  *
  * Registration Mechanism:
  * - The runtime object is intersected with `PhantomProps<Props>`.
- * - This adds an OPTIONAL unique-symbol "slot" (`[PROPS_IDENTITY_ANCHOR]?: Props`)
- *   carrying the `Props` type.
+ * - This adds an OPTIONAL protocol field (`PROPS_IDENTITY_ANCHOR?: Props`)
+ *   carrying the `Props` type in type space.
+ * - The anchor uses a literal field name (not a symbol key) to keep public
+ *   declaration output portable for downstream consumers.
  * - This slot has no runtime impact, but enables the TypeScript compiler to
  *   retrieve the generic type later.
  *
@@ -145,9 +147,10 @@ export type RegistryEntry<
  *    to `{ label: string }`.
  *
  * 2. Transport (Stamping):
- *    The function explicitly returns the object cast as `RegistryEntry<{ label: string }>`.
+ *    The overload return type presents the value as
+ *    `RegistryEntry<{ label: string }, DefaultRuntimeConfig>`.
  *    This adds the invisible Phantom Prop slot to the resulting type definition:
- *    `{ ..., [PROPS_IDENTITY_ANCHOR]?: { label: string } }`.
+ *    `{ ..., PROPS_IDENTITY_ANCHOR?: { label: string } }`.
  *    This type information is now permanently associated with `ButtonEntry`.
  *
  * 3. Access (Downstream):
@@ -189,13 +192,13 @@ export function defineEntry<Props extends object>(
  *
  * Composition Trace (How the type is formed):
  *   1. `StaticVariant`: Provides `{ component: ... }`
- *   2. `PhantomProps`:  Provides `{ [PROPS_IDENTITY_ANCHOR]?: Props }`
+ *   2. `PhantomProps`:  Provides `{ PROPS_IDENTITY_ANCHOR?: Props }`
  *   3. Intersection (`&`): Merges them into the final `RegistryEntry`.
  *      Since part 2 is optional, part 1 alone satisfies the intersection.
  *
  * Example:
  *   Input (Runtime): `{ component: MyComp }`
- *   Required Type:   `{ component: MyComp; [PROPS_IDENTITY_ANCHOR]?: Props }`
+ *   Required Type:   `{ component: MyComp; PROPS_IDENTITY_ANCHOR?: Props }`
  *   Result:          Valid assignment. The missing optional property is allowed.
  */
 export function defineEntry<T extends object>(entry: T): T {
