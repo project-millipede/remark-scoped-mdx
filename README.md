@@ -11,19 +11,9 @@ based on nesting context.
 
 1. [Features](#features)
 2. [Why Scoped Rewrites](#why-scoped-rewrites)
-3. [When You Need Scoped Overrides](#when-you-need-scoped-overrides)
-4. [Installation](#installation)
-5. [Examples](#examples)
-6. [How to Use](#how-to-use)
-7. [Step 1: Define Rules](#step-1-define-rules)
-8. [Step 2: Register Plugin](#step-2-register-plugin)
-9. [Step 3: Build the Runtime Component Map (Simple)](#step-3-build-the-runtime-component-map-simple)
-10. [Configuration Reference](#configuration-reference)
-11. [Public API](#public-api)
-12. [Authoring Utilities (Why This Helps)](#authoring-utilities-why-this-helps)
-13. [Transform Option Reference](#transform-option-reference)
-14. [Advanced: Traversal and Limitations](#advanced-traversal-and-limitations)
-15. [Dedicated Example: Behavior Context (Optional, Advanced)](#dedicated-example-behavior-context-optional-advanced)
+3. [Getting Started](#getting-started)
+4. [Reference](#reference)
+5. [Advanced](#advanced)
 
 ## Features
 
@@ -58,7 +48,9 @@ context-specific behavior.
 | **Execution stage** | Runtime provider mapping                | Compile-time remark transform metadata                   |
 | **Node focus**      | Renderer output level                   | MDX JSX flow nodes (`mdxJsxFlowElement`)                 |
 
-## Installation
+## Getting Started
+
+### Installation
 
 ```bash
 npm install remark-scoped-mdx unified react
@@ -68,9 +60,9 @@ pnpm add remark-scoped-mdx unified react
 
 If you use `next/dynamic` in the runtime resolver examples, also install `next`.
 
-## Examples
+### Examples
 
-### Real-World: Props inference (Essential)
+#### Real-World: Props inference (Essential)
 
 `AlertParagraph` is declared once, and its prop type is reused automatically in
 transform authoring.
@@ -137,11 +129,11 @@ Declaration principle:
 - `defineEntry` captures that type.
 - `target.to({ component: { name, props } })` is checked against that captured type.
 
-## How to Use
+### How to Use
 
 > **Important:** This plugin requires **three configuration steps**: define your component rules, register the plugin with your MDX compiler, then build the runtime component map for rendering. Steps 1-2 handle compile-time rewrites; Step 3 enables scoped component rendering at runtime.
 
-### Step 1: Define Rules
+#### Step 1: Define Rules
 
 Define your typed component registry first, then derive the transform registry.
 
@@ -182,12 +174,12 @@ const mdxOptions = {
 };
 ```
 
-### Step 2: Register Plugin
+#### Step 2: Register Plugin
 
 Pass your rule registry to `remarkScopedMdx` in your MDX compilation
 configuration.
 
-#### Option A: Using `@mdx-js/mdx` directly
+##### Option A: Using `@mdx-js/mdx` directly
 
 ```ts
 import { compile, type CompileOptions } from '@mdx-js/mdx';
@@ -202,7 +194,7 @@ const mdxOptions: CompileOptions = {
 const compiled = await compile(mdxSource, mdxOptions);
 ```
 
-#### Option B: Using Next.js with `@next/mdx`
+##### Option B: Using Next.js with `@next/mdx`
 
 ```ts
 // next.config.mjs
@@ -224,9 +216,9 @@ const withMDX = createMDX({
 export default withMDX(nextConfig);
 ```
 
-### Step 3: Build the Runtime Component Map (Simple)
+#### Step 3: Build the Runtime Component Map (Simple)
 
-#### Step 3a: Create the resolver and component set
+##### Step 3a: Create the resolver and component set
 
 ```ts
 import dynamic from 'next/dynamic';
@@ -250,7 +242,7 @@ const { createComponentSet, getLoadableComponentsFromSet } =
 const scopedComponentSet = createComponentSet(scopeRegistry);
 ```
 
-#### Step 3b: Resolve hydrated components and create a renderable MDX content component
+##### Step 3b: Resolve hydrated components and create a renderable MDX content component
 
 ```tsx
 import type { FC } from 'react';
@@ -293,7 +285,7 @@ const ScopedContent = createScopedMdxContent(Content, hydratedComponents);
 return <ScopedContent />;
 ```
 
-## Configuration Reference
+## Reference
 
 ### Public API
 
@@ -363,9 +355,11 @@ Notes:
 - It affects MDX JSX **flow** nodes only (`MdxJsxFlowElement`).
 - It does not affect inline JSX text nodes or markdown `paragraph` nodes.
 
-## Advanced: Traversal and Limitations
+## Advanced
 
-### Transformation Model (Two-Phase Traversal)
+### Traversal and Limitations
+
+#### Transformation Model (Two-Phase Traversal)
 
 1. Outer traversal discovers scope roots:
    MDX JSX **flow** elements whose `name` exists in the registry and declares
@@ -373,12 +367,12 @@ Notes:
 2. Inner traversal runs within each discovered scope subtree:
    matching MDX JSX flow elements are renamed and target props are emitted.
 
-### Scope Boundaries
+#### Scope Boundaries
 
 Nested configured scopes are boundaries. Parent-scope rewrites do not cross into
 nested scope subtrees.
 
-### Flow vs Inline JSX
+#### Flow vs Inline JSX
 
 - ✅ Supported: MDX JSX **flow** elements (`MdxJsxFlowElement`)
   - Standalone flow JSX:
@@ -402,7 +396,7 @@ nested scope subtrees.
     <p>Hello<br />world</p>
     ```
 
-### Paragraph Caveat (`<p>` JSX vs Markdown paragraph)
+#### Paragraph Caveat (`<p>` JSX vs Markdown paragraph)
 
 - ✅ Rewritten: explicit JSX `<p>` flow elements
   - Example (inside a scope):
@@ -421,12 +415,12 @@ nested scope subtrees.
     ```
   - This becomes a markdown paragraph node, not an `MdxJsxFlowElement`.
 
-## Dedicated Example: Behavior Context (Optional, Advanced)
+### Dedicated Example: Behavior Context (Optional, Advanced)
 
 This is a separate advanced pattern focused on runtime behavior control. It is
 not required for the basic scoped rewrite flow above.
 
-### Advanced Step 1: Define Runtime Flags and Behavior-Aware Scope Registry
+#### Advanced Step 1: Define Runtime Flags and Behavior-Aware Scope Registry
 
 ```tsx
 import type { FC, ReactNode } from 'react';
@@ -483,7 +477,7 @@ export const behaviorScopedComponents = defineComponents(
 );
 ```
 
-### Advanced Step 2: Derive and Register the Transform Registry
+#### Advanced Step 2: Derive and Register the Transform Registry
 
 ```ts
 import {
@@ -499,7 +493,7 @@ const mdxOptions = {
 };
 ```
 
-### Advanced Step 3a: Create the Runtime Resolver and Component Set
+#### Advanced Step 3a: Create the Runtime Resolver and Component Set
 
 ```tsx
 import type { ComponentType } from 'react';
@@ -571,7 +565,7 @@ export const behaviorScopedComponentSet =
   createComponentSet(behaviorScopedComponents);
 ```
 
-### Advanced Step 3b: Resolve Hydrated Components and Return Renderable Content
+#### Advanced Step 3b: Resolve Hydrated Components and Return Renderable Content
 
 ```tsx
 import type { FC } from 'react';
