@@ -1,0 +1,44 @@
+{
+  "name": "remark-scoped-mdx",
+  "version": "0.8.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "estree-util-value-to-estree": "^3.5.0",
+    "mdast-util-mdx-jsx": "^3.2.0",
+    "unist-util-is": "^6.0.0",
+    "unist-util-visit": "^5.0.0"
+  },
+  "peerDependencies": {
+    "next": ">=13.0.0",
+    "react": ">=18.0.0",
+    "unified": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.13",
+    "@types/unist": "^3.0.3",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "tsup": "^8.5.1",
+    "type-fest": "^5.4.3",
+    "typescript": "^5.9.3",
+    "unified": "^11.0.5"
+  }
+}
