@@ -10,3 +10,9 @@ export * from './authoring';
 
 export { defineEntry, createDefineEntry } from './mdx/loadable/definitions';
 export { createLoaderUtils } from './mdx/loadable/loader';
+export type {
+  PhantomProps,
+  PhantomRegistry,
+  PropsOfEntry,
+  PropsOfEntryOr
+} from './mdx/entry-protocol';
