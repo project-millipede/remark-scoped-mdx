@@ -354,3 +354,21 @@ export function createLoaderUtils<Config extends object>(
     getLoadableComponentsFromSet
   };
 }
+
+/**
+ * Public type alias for the object returned by `createLoaderUtils(resolveEntry)`.
+ *
+ * `createLoaderUtils` binds one entry-resolution strategy and returns the
+ * public loader API built around that strategy, including prepared-set creation
+ * and component resolution helpers.
+ *
+ * Downstream packages can reference `LoaderUtils<Config>` when they need the
+ * exact public shape of that bound loader API, instead of restating the
+ * factory result locally.
+ *
+ * @template Config - Application-specific runtime configuration available on
+ * registry entries consumed by the bound loader API.
+ */
+export type LoaderUtils<Config extends object> = ReturnType<
+  typeof createLoaderUtils<Config>
+>;

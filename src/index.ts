@@ -10,6 +10,15 @@ export * from './authoring';
 
 export { defineEntry, createDefineEntry } from './mdx/loadable/definitions';
 export { createLoaderUtils } from './mdx/loadable/loader';
+
+export type {
+  LoaderResolver,
+  LoaderUtils,
+  PreparedRegistry,
+  ResolvedMap,
+  ResolvedComponentOf
+} from './mdx/loadable/loader';
+
 export type {
   PhantomProps,
   PhantomRegistry,
